@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlipSay — Browser SDR for Flipper Zero</title>
+<link rel="stylesheet" href="css/flipsay.css">
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════
+     Welcome modal — dismissed by button, Escape, or backdrop click
+     ══════════════════════════════════════════════════════════ -->
+<div id="welcome">
+  <div id="welcome-box">
+    <div id="welcome-logo">FlipSay</div>
+    <div id="welcome-beta">◈ PUBLIC BETA ◈</div>
+    <div class="wline"></div>
+    <div id="welcome-msg">
+      Welcome to <span>FlipSay</span> — the first browser-based<br>
+      SDR-style interface for <span>Flipper Zero</span>.<br><br>
+      Connect your Flipper via USB and start<br>
+      exploring the radio spectrum in real time.
+    </div>
+    <div class="wline"></div>
+    <ul id="welcome-notes">
+      <li>Requires <span style="color:var(--OB)">Momentum firmware</span> (developer version)</li>
+      <li>Enable <span style="color:var(--OB)">Debug Mode</span> on your Flipper first</li>
+      <li>Use <span style="color:var(--OB)">Google Chrome</span> or <span style="color:var(--OB)">Microsoft Edge</span></li>
+      <li>Close <span style="color:var(--OB)">qFlipper</span> before connecting</li>
+      <li>This is a <span style="color:var(--YEL)">beta</span> — bugs may occur. Report them on GitHub!</li>
+    </ul>
+    <div class="wline"></div>
+    <div style="font-size:9px;color:var(--DIM);text-align:center;letter-spacing:2px;">
+      Open source · flipsay.dev · v0.9-beta
+    </div>
+    <button id="welcome-ok">LET'S GO ▶</button>
+  </div>
+</div>
+
+<div id="frame">
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <!-- ════════════════════════════════════════════════════════
+       Header: logo, connection status, connect button
+       ════════════════════════════════════════════════════════ -->
+  <div id="hdr">
+    <div id="logo">
+      <svg width="42" height="42" viewBox="0 0 44 44" style="image-rendering:pixelated;flex-shrink:0;">
+        <rect width="44" height="44" fill="#1A0900"/>
+        <rect x="1" y="1" width="42" height="42" fill="none" stroke="#FF8000" stroke-width="2"/>
+        <rect x="4"  y="22" width="4" height="4"  fill="#FF8000"/>
+        <rect x="8"  y="18" width="4" height="8"  fill="#FF8000"/>
+        <rect x="12" y="14" width="4" height="14" fill="#FFA030"/>
+        <rect x="16" y="12" width="4" height="18" fill="#FFA030"/>
+        <rect x="20" y="14" width="4" height="14" fill="#FF8000"/>
+        <rect x="24" y="18" width="4" height="10" fill="#C05000"/>
+        <rect x="28" y="20" width="4" height="8"  fill="#C05000"/>
+        <rect x="32" y="22" width="6" height="4"  fill="#7A3000"/>
+        <rect x="34" y="18" width="4" height="4"  fill="#C05000"/>
+        <rect x="34" y="26" width="4" height="4"  fill="#C05000"/>
+        <rect x="18" y="8"  width="4" height="6"  fill="#FF8000"/>
+        <rect x="20" y="4"  width="2" height="4"  fill="#FFA030"/>
+        <rect x="14" y="16" width="2" height="2"  fill="#FFD060"/>
+        <rect x="2"  y="14" width="2" height="2"  fill="#FF8000"/>
+        <rect x="2"  y="19" width="2" height="2"  fill="#C05000"/>
+        <rect x="2"  y="24" width="2" height="2"  fill="#7A3000"/>
+        <rect x="38" y="10" width="2" height="2"  fill="#FFA030"/>
+        <rect x="40" y="8"  width="2" height="2"  fill="#FF8000"/>
+        <rect x="38" y="16" width="2" height="2"  fill="#FFA030"/>
+      </svg>
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div id="logo-title">FlipSay</div>
+          <div id="beta-badge">BETA</div>
+        </div>
+        <div id="logo-sub">— Open Source —</div>
+      </div>
+    </div>
+    <div id="hdr-right">
+      <div id="conn-info">
+        <div id="conn-device">Not Connected</div>
+        <div id="conn-tty">USB Serial Disconnected</div>
+      </div>
+      <button id="conn-btn" onclick="flipsay.toggleConnect()">CONNECT USB</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div id="tabs">
+    <div class="tab active" onclick="flipsay.showTab('spectrum', this)">Spectrum</div>
+    <div class="tab"        onclick="flipsay.showTab('subghz',   this)">Sub-GHz</div>
+    <div class="tab"        onclick="flipsay.showTab('signals',  this)">Signals</div>
+    <div class="tab"        onclick="flipsay.showTab('device',   this)">Device</div>
+    <div class="tab"        onclick="flipsay.showTab('files',    this)">Files</div>
+    <div class="tab"        onclick="flipsay.showTab('logs',     this)">Logs</div>
+    <div class="tab"        onclick="flipsay.showTab('settings', this)">Settings</div>
+  </div>
+
+  <!-- Body -->
+  <div id="body">
+
+    <!-- Disconnect overlay -->
+    <div id="overlay">
+      <div id="ov-icon">⬡</div>
+      <div id="ov-title">FLIPPER NOT CONNECTED</div>
+      <div id="ov-sub">
+        Connect Flipper Zero via USB cable.<br>
+        Close qFlipper · Enable Debug Mode<br>
+        Momentum firmware required.<br>
+        Chrome or Edge only (WebSerial API).
+      </div>
+      <button id="ov-btn" onclick="flipsay.toggleConnect()">CONNECT NOW</button>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Spectrum view — live RSSI + waterfall (resizable panels)
+         ══════════════════════════════════════════════════════ -->
+    <div id="view-spectrum" class="view active">
+      <div id="spectrum-body">
+        <div id="center">
+          <div id="center-top">
+
+            <!-- Frequency / sweep / bandwidth bar -->
+            <div id="fbar">
+              <button class="fnav" onclick="flipsay.stepFreq(-10)" title="-1 MHz">◄◄◄</button>
+              <button class="fnav" onclick="flipsay.stepFreq(-1)"  title="-100 kHz">◄◄</button>
+              <button class="fnav" onclick="flipsay.stepFreq(-0.01)" title="-1 kHz">◄</button>
+              <input type="number" id="fdisp-input"
+                     value="433.920000" step="0.000100" min="300" max="928"
+                     onchange="flipsay.setFreqMHz(this.value)"
+                     style="width:120px;font-size:var(--big);background:var(--BG3);border:2px solid var(--OD);color:var(--OB);font-family:var(--PX);padding:3px 5px;text-align:center;">
+              <span style="font-size:var(--tiny);color:var(--DIM);">MHz</span>
+              <button class="fnav" onclick="flipsay.stepFreq(0.01)"  title="+1 kHz">►</button>
+              <button class="fnav" onclick="flipsay.stepFreq(1)"     title="+100 kHz">►►</button>
+              <button class="fnav" onclick="flipsay.stepFreq(10)"    title="+1 MHz">►►►</button>
+              <select class="pxs" id="preset-sel" onchange="flipsay.applyPreset(this.value)">
+                <option value="">— preset —</option>
+                <option value="315000000">315.00 MHz</option>
+                <option value="318000000">318.00 MHz</option>
+                <option value="390000000">390.00 MHz</option>
+                <option value="433075000">433.075</option>
+                <option value="433420000">433.42 MHz</option>
+                <option value="433920000">433.92 MHz</option>
+                <option value="434420000">434.42 MHz</option>
+                <option value="434775000">434.775</option>
+                <option value="868350000">868.35 MHz</option>
+                <option value="915000000">915.00 MHz</option>
+              </select>
+              <span style="font-size:var(--tiny);color:var(--DIM);">BW</span>
+              <input type="number" id="bw-input" min="50" max="10000" step="50" value="1000"
+                     onchange="flipsay.setBW(this.value)"
+                     style="width:60px;font-size:var(--small);background:var(--BG3);border:2px solid var(--OD);color:var(--OB);font-family:var(--PX);padding:3px 4px;">
+              <span style="font-size:var(--tiny);color:var(--DIM);">kHz</span>
+              <button class="pxbtn" id="scanbtn" onclick="flipsay.startSweep()">▶ SWEEP</button>
+              <button class="pxbtn red"          onclick="flipsay.stopAll()">■ STOP ALL</button>
+              <button class="pxbtn" id="rxhere-btn" onclick="flipsay.rxHere()">RX HERE</button>
+            </div>
+
+            <!-- Spectrum mode selector -->
+            <div id="mode-bar">
+              <span id="mode-label">SPECTRUM MODE:</span>
+              <button class="mode-btn active" id="mb-real" onclick="flipsay.setMode('real', this)">REAL</button>
+              <button class="mode-btn"        id="mb-sim"  onclick="flipsay.setMode('sim',  this)">SIMULATION</button>
+              <button class="mode-btn"        id="mb-pkg"  onclick="flipsay.setMode('pkg',  this)">PACKAGE</button>
+              <span id="mode-desc">Amplified real RSSI · tiny signals visible</span>
+            </div>
+
+            <!-- Spectrum + waterfall canvases -->
+            <div id="speczone">
+              <div id="yaxis">
+                <span style="font-size:var(--tiny);color:var(--OD);">RSSI</span>
+                <span>-20</span><span>-40</span><span>-60</span><span>-80</span><span>-90</span>
+              </div>
+              <div id="canvases">
+                <div id="data-badge" class="idle">● WAITING</div>
+                <canvas id="spec-canvas"></canvas>
+                <canvas id="wf-canvas"></canvas>
+                <div id="xaxis">
+                  <span id="xa-l">—</span>
+                  <span id="xa-m1">—</span>
+                  <span id="xa-c">433.920000 MHz</span>
+                  <span id="xa-m2">—</span>
+                  <span id="xa-r">—</span>
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /#center-top -->
+
+        <!-- ════════════════════════════════════════════════════
+             Lower strip — demod / gain / mini logs
+             ────────────────────────────────────────────────────
+             NOTE on cosmetic controls: the Demodulation block
+             below contains UI for parameters the Flipper CLI
+             does not expose at runtime (threshold, sync width,
+             AFC, accuracy). They're kept for visual fidelity
+             with SDR tools but their values are not transmitted.
+             To wire them, custom firmware would be needed.
+             ════════════════════════════════════════════════════ -->
+        <div id="lower">
+          <div id="demod">
+            <div class="ptitle">Demodulation</div>
+            <div class="dr">
+              <span class="dl">Mode</span>
+              <select class="pxs" id="demod-mode" onchange="flipsay.setModulation(this.value)">
+                <option value="AM650">AM650 (default)</option>
+                <option value="AM270">AM270</option>
+                <option value="FM238">FM238</option>
+                <option value="FM476">FM476</option>
+              </select>
+            </div>
+            <div class="dr">
+              <span class="dl">Continuous</span>
+              <button class="pxbtn" id="continuous-btn" onclick="flipsay.toggleContinuous()" style="font-size:var(--tiny);padding:3px 6px;">START</button>
+            </div>
+            <div id="bigfreq-box">
+              <div style="display:flex;align-items:baseline;gap:4px;">
+                <span id="bigfreq">433.920000</span><span id="bfunit">MHz</span>
+              </div>
+              <div id="sigbar"><div id="sigfill"></div></div>
+            </div>
+          </div>
+
+          <div id="gain">
+            <div class="ptitle">Gain Stages <span style="font-size:var(--tiny);color:var(--DIM);">(display only)</span></div>
+            <div style="font-size:var(--small);color:var(--OB);margin-bottom:4px;">RX Amplifier</div>
+            <div class="gb-row">
+              <span class="gb-label">LNA Gain</span>
+              <div class="gb-track" id="lna-track">
+                <div class="gb-fill" id="lna-fill" style="width:80%"></div>
+                <div class="gb-head" id="lna-head" style="left:80%"></div>
+              </div>
+            </div>
+            <div class="gb-row">
+              <span class="gb-label">Mixer Gain</span>
+              <div class="gb-track" id="mix-track">
+                <div class="gb-fill" id="mix-fill" style="width:66%"></div>
+                <div class="gb-head" id="mix-head" style="left:66%"></div>
+              </div>
+            </div>
+            <div class="gb-row">
+              <span class="gb-label">IF Gain</span>
+              <div class="gb-track" id="if-track">
+                <div class="gb-fill" id="if-fill" style="width:70%"></div>
+                <div class="gb-head" id="if-head" style="left:70%"></div>
+              </div>
+            </div>
+            <div class="dr" style="margin-top:3px;">
+              <span class="dl">LO:</span>
+              <span class="dv" id="lo-v">431.72 MHz</span>
+              <span class="dl" style="margin-left:8px;">Calc'd</span>
+              <span class="dv">f - 2.2</span>
+            </div>
+          </div>
+
+          <div id="mini-logs">
+            <div class="ptitle">Logs</div>
+            <div id="loglist"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel: tuner status -->
+      <div id="right">
+        <div class="rp-sec">
+          <div class="rp-title">Tuner</div>
+          <div id="rxtx">
+            <button class="rxtx-btn on" id="rx-b" onclick="flipsay.setRXTX('rx')">RX</button>
+            <button class="rxtx-btn"    id="tx-b" onclick="flipsay.setRXTX('tx')">TX</button>
+          </div>
+        </div>
+        <div class="rp-sec">
+          <div class="rp-title">Frequency</div>
+          <div class="rp-row" style="gap:3px;">
+            <button class="pxbtn active" onclick="flipsay.recordFreq()" style="font-size:var(--tiny);padding:3px 5px;">Record</button>
+            <button class="pxbtn"        onclick="flipsay.clearFreq()"  style="font-size:var(--tiny);padding:3px 5px;">Clear</button>
+            <button class="pxbtn"        onclick="flipsay.saveFreq()"   style="font-size:var(--tiny);padding:3px 5px;">Save</button>
+          </div>
+          <div class="rp-row" style="margin-top:6px;"><span class="rp-lbl">Live RSSI</span><span class="rp-val" id="live-rssi">— dBm</span></div>
+          <div class="rp-row"><span class="rp-lbl">Pkts Rcvd</span><span class="rp-val" id="pkt-count">0</span></div>
+          <div class="rp-row"><span class="rp-lbl">Mode</span><span class="rp-val" id="mode-badge">REAL</span></div>
+        </div>
+        <div class="rp-sec">
+          <div class="rp-title">Gain Display</div>
+          <div class="rp-gain-row">
+            <span class="rp-gain-lbl">LNA</span>
+            <div class="rp-gain-bar"><div class="rp-gain-fill" id="rp-lna" style="width:80%"></div></div>
+            <span class="rp-gain-val" id="rp-lna-v">32 dB</span>
+          </div>
+          <div class="rp-gain-row">
+            <span class="rp-gain-lbl">Mixer</span>
+            <div class="rp-gain-bar"><div class="rp-gain-fill" id="rp-mix" style="width:66%"></div></div>
+            <span class="rp-gain-val" id="rp-mix-v">16 dB</span>
+          </div>
+          <div class="rp-gain-row">
+            <span class="rp-gain-lbl">IF</span>
+            <div class="rp-gain-bar"><div class="rp-gain-fill" id="rp-if" style="width:70%"></div></div>
+            <span class="rp-gain-val" id="rp-if-v">28 dB</span>
+          </div>
+        </div>
+      </div><!-- /#right -->
+      </div><!-- /#spectrum-body -->
+    </div><!-- /#view-spectrum -->
+
+    <!-- ══════════════════════════════════════════════════════
+         Sub-GHz view — direct CLI commands
+         ══════════════════════════════════════════════════════ -->
+    <div id="view-subghz" class="view">
+      <div class="tab-inner">
+        <div class="tbox">
+          <div class="tbox-title">Sub-GHz — RX / TX</div>
+          <div class="tbox-row">
+            <div class="tfield">
+              <label>Frequency (Hz)</label>
+              <input type="number" id="sg-freq" value="433920000" min="300000000" max="928000000" step="1000" style="width:130px;">
+            </div>
+            <div class="tfield">
+              <label>Device</label>
+              <select id="sg-dev">
+                <option value="0">Internal CC1101</option>
+                <option value="1">External CC1101</option>
+              </select>
+            </div>
+          </div>
+          <div class="tbox-row" style="gap:5px;margin-top:4px;">
+            <button class="bigbtn"     onclick="flipsay.sgRX()">► RX</button>
+            <button class="bigbtn"     onclick="flipsay.sgRXRaw()">► RX RAW</button>
+            <button class="bigbtn red" onclick="flipsay.sgStop()">■ STOP</button>
+            <button class="bigbtn"     onclick="flipsay.sgFreqAna()">FREQ ANALYZER</button>
+            <button class="bigbtn"     onclick="flipsay.sgChat()">CHAT</button>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">TX — Transmit Key</div>
+          <div class="tbox-row">
+            <div class="tfield">
+              <label>Key (3 bytes hex)</label>
+              <input type="text" id="tx-key" value="AABBCC" maxlength="6" pattern="[0-9A-Fa-f]{1,6}" style="width:85px;">
+            </div>
+            <div class="tfield">
+              <label>TE (µs)</label>
+              <input type="number" id="tx-te" value="300" style="width:65px;">
+            </div>
+            <div class="tfield">
+              <label>Repeat</label>
+              <input type="number" id="tx-rep" value="3" min="1" max="10" style="width:50px;">
+            </div>
+          </div>
+          <button class="bigbtn red" onclick="flipsay.sgTX()" style="margin-top:3px;">TRANSMIT</button>
+          <div style="font-size:var(--tiny);color:var(--DIM);margin-top:6px;line-height:1.8;">
+            ▸ Only transmit on frequencies you are licensed for.<br>
+            ▸ Replaying captured codes against gates, cars, or property you do not own is illegal.
+          </div>
+        </div>
+
+        <div class="tbox" style="flex:1;display:flex;flex-direction:column;">
+          <div class="tbox-title">Serial Output</div>
+          <div id="rxout">[Connect Flipper Zero to begin]
+</div>
+          <div style="display:flex;gap:5px;margin-top:5px;">
+            <button class="bigbtn" onclick="flipsay.clearRX()" style="font-size:var(--small);padding:4px 9px;">CLEAR</button>
+            <button class="bigbtn" onclick="flipsay.saveRX()"  style="font-size:var(--small);padding:4px 9px;">SAVE .TXT</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signals view -->
+    <div id="view-signals" class="view">
+      <div class="tab-inner">
+        <div style="font-size:var(--med);color:var(--OB);margin-bottom:6px;">Detected Signals</div>
+        <div style="display:flex;gap:5px;margin-bottom:7px;">
+          <button class="bigbtn" onclick="flipsay.clearSigs()"  style="font-size:var(--small);padding:4px 9px;">CLEAR</button>
+          <button class="bigbtn" onclick="flipsay.exportSigs()" style="font-size:var(--small);padding:4px 9px;">EXPORT</button>
+        </div>
+        <div id="siglist">
+          <div style="font-size:var(--small);color:var(--DIM);">No signals detected yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Device view — battery, apps, GPIO, LED, vibro
+         ══════════════════════════════════════════════════════ -->
+    <div id="view-device" class="view">
+      <div class="tab-inner">
+
+        <div class="tbox">
+          <div class="tbox-title">Battery & Power</div>
+          <div class="tbox-row">
+            <button class="bigbtn" onclick="flipsay.refreshPowerInfo()">REFRESH</button>
+            <button class="bigbtn" onclick="flipsay.refreshDeviceInfo()">DEVICE INFO</button>
+            <button class="bigbtn" onclick="flipsay.neofetch()">NEOFETCH</button>
+            <button class="bigbtn red" onclick="flipsay.powerReboot()">REBOOT</button>
+            <button class="bigbtn red" onclick="flipsay.powerOff()">POWER OFF</button>
+          </div>
+          <div class="tbox-row" style="gap:14px;margin-top:8px;">
+            <div class="tfield"><label>Charge</label><span class="dv" id="pwr-charge">— %</span></div>
+            <div class="tfield"><label>Voltage</label><span class="dv" id="pwr-voltage">— V</span></div>
+            <div class="tfield"><label>Current</label><span class="dv" id="pwr-current">— mA</span></div>
+            <div class="tfield"><label>Temp</label><span class="dv" id="pwr-temp">— °C</span></div>
+            <div class="tfield"><label>Health</label><span class="dv" id="pwr-health">—</span></div>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">LED & Vibration</div>
+          <div class="tbox-row">
+            <div class="tfield">
+              <label>R</label>
+              <input type="range" class="pxr" id="led-r" min="0" max="255" value="0" style="width:120px;">
+            </div>
+            <div class="tfield">
+              <label>G</label>
+              <input type="range" class="pxr" id="led-g" min="0" max="255" value="0" style="width:120px;">
+            </div>
+            <div class="tfield">
+              <label>B</label>
+              <input type="range" class="pxr" id="led-b" min="0" max="255" value="0" style="width:120px;">
+            </div>
+            <div class="tfield">
+              <label>Backlight</label>
+              <input type="range" class="pxr" id="led-bl" min="0" max="255" value="128" style="width:120px;">
+            </div>
+          </div>
+          <div class="tbox-row" style="margin-top:6px;">
+            <button class="bigbtn" onclick="flipsay.applyLED()">APPLY LED</button>
+            <button class="bigbtn" onclick="flipsay.applyBacklight()">APPLY BACKLIGHT</button>
+            <button class="bigbtn" onclick="flipsay.ledOff()">LED OFF</button>
+            <button class="bigbtn" onclick="flipsay.vibrate(200)">VIBRATE 200ms</button>
+            <button class="bigbtn" onclick="flipsay.vibrate(800)">VIBRATE 800ms</button>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">Apps</div>
+          <div class="tbox-row">
+            <button class="bigbtn" onclick="flipsay.listApps()">REFRESH LIST</button>
+            <button class="bigbtn red" onclick="flipsay.closeApp()">CLOSE RUNNING APP</button>
+          </div>
+          <div id="app-list" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;">
+            <div style="font-size:var(--small);color:var(--DIM);">Click REFRESH LIST.</div>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">GPIO</div>
+          <div style="font-size:var(--tiny);color:var(--DIM);margin-bottom:5px;line-height:1.8;">
+            Pins: pa7, pa6, pa4, pb3, pb2, pc3, pc1, pc0
+          </div>
+          <div class="tbox-row">
+            <div class="tfield">
+              <label>Pin</label>
+              <select id="gpio-pin">
+                <option>pa7</option><option>pa6</option><option>pa4</option>
+                <option>pb3</option><option>pb2</option>
+                <option>pc3</option><option>pc1</option><option>pc0</option>
+              </select>
+            </div>
+            <button class="bigbtn" onclick="flipsay.gpioMode(true)">SET OUTPUT</button>
+            <button class="bigbtn" onclick="flipsay.gpioMode(false)">SET INPUT</button>
+            <button class="bigbtn" onclick="flipsay.gpioSet(1)">HIGH</button>
+            <button class="bigbtn" onclick="flipsay.gpioSet(0)">LOW</button>
+            <button class="bigbtn" onclick="flipsay.gpioRead()">READ</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Files view — saved .sub files with TX-from-file
+         ══════════════════════════════════════════════════════ -->
+    <div id="view-files" class="view">
+      <div class="tab-inner">
+        <div class="tbox">
+          <div class="tbox-title">Saved Sub-GHz Captures</div>
+          <div class="tbox-row">
+            <button class="bigbtn" onclick="flipsay.listSubFiles('/ext/subghz')">REFRESH</button>
+            <span style="font-size:var(--small);color:var(--DIM);align-self:center;">/ext/subghz</span>
+          </div>
+          <div style="font-size:var(--tiny);color:var(--DIM);margin-top:6px;line-height:1.8;">
+            ▸ Click TX next to a .sub file to transmit it from the Flipper.<br>
+            ▸ Same legal warnings apply — only TX on bands you're licensed for.
+          </div>
+          <div id="sub-list" style="margin-top:8px;">
+            <div style="font-size:var(--small);color:var(--DIM);">Click REFRESH.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         Settings view — UI scale and preferences
+         ══════════════════════════════════════════════════════ -->
+    <div id="view-settings" class="view">
+      <div class="tab-inner">
+        <div class="tbox">
+          <div class="tbox-title">Display</div>
+          <div class="tbox-row" style="align-items:center;">
+            <div class="tfield" style="flex:1;">
+              <label>UI scale (Ctrl++ / Ctrl+- / Ctrl+0)</label>
+              <input type="range" class="pxr" id="scale-sl" min="0.8" max="3.0" step="0.1"
+                     value="1.5" style="width:100%;"
+                     oninput="flipsay.setScale(this.value)">
+            </div>
+            <div class="dv" id="scale-val" style="min-width:60px;text-align:right;">1.5×</div>
+          </div>
+          <div class="tbox-row" style="margin-top:8px;">
+            <button class="bigbtn" onclick="flipsay.setScale(1.0)">1.0× tight</button>
+            <button class="bigbtn" onclick="flipsay.setScale(1.5)">1.5× default</button>
+            <button class="bigbtn" onclick="flipsay.setScale(2.0)">2.0× large</button>
+            <button class="bigbtn" onclick="flipsay.setScale(2.5)">2.5× huge</button>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">Layout</div>
+          <div style="font-size:var(--tiny);color:var(--DIM);line-height:1.8;margin-bottom:6px;">
+            ▸ Drag the orange gutters between panels to resize.<br>
+            ▸ Sizes are saved automatically per-browser.<br>
+            ▸ Reset returns all panels to default sizes.
+          </div>
+          <button class="bigbtn red" onclick="flipsay.resetLayout()">RESET LAYOUT</button>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">Debug</div>
+          <div class="tbox-row">
+            <button class="bigbtn" onclick="flipsay.setVerbose(true)">VERBOSE ON</button>
+            <button class="bigbtn" onclick="flipsay.setVerbose(false)">VERBOSE OFF</button>
+            <span style="font-size:var(--tiny);color:var(--DIM);align-self:center;line-height:1.8;">
+              Logs every TX/RX byte to DevTools console.
+            </span>
+          </div>
+        </div>
+
+        <div class="tbox">
+          <div class="tbox-title">About</div>
+          <div style="font-size:var(--small);color:var(--DIM);line-height:2;">
+            FlipSay — browser SDR for Flipper Zero<br>
+            Open source · MIT-licensed rewrite<br>
+            Requires Momentum firmware with Debug Mode enabled<br>
+            Not affiliated with Flipper Devices Inc.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs view -->
+    <div id="view-logs" class="view">
+      <div class="tab-inner" style="gap:5px;">
+        <div style="display:flex;gap:5px;">
+          <button class="bigbtn" onclick="flipsay.clearLogs()"  style="font-size:var(--small);padding:4px 9px;">CLEAR</button>
+          <button class="bigbtn" onclick="flipsay.exportLogs()" style="font-size:var(--small);padding:4px 9px;">EXPORT</button>
+        </div>
+        <div id="fulllog"></div>
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- Status bar -->
+  <div id="sbar">
+    <span class="dot" id="dot">■</span>
+    <span id="sb-conn">Disconnected</span>
+    <span>|</span><span>Bandwth</span><span id="sb-bw">1000 kHz</span>
+    <span>|</span><span>RSSI</span><span id="sb-rssi">-- dBm</span>
+    <span>|</span><span>Mode</span><span id="sb-mode-txt">REAL</span>
+    <span id="sbar-time" style="margin-left:auto;"></span>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
