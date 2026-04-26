@@ -1,17 +1,3 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — global control flow
-// ────────────────────────────────────────────────────────────────
-// "Stop All" stops everything in one click: cancels the sweep,
-// disables continuous mode, and sends Ctrl+C to the Flipper to
-// kill any in-flight `subghz rx`. This is what you want as the
-// big red button.
-//
-// Continuous mode parks on a single frequency and keeps RX alive
-// indefinitely — when the Flipper's `subghz rx` returns to the
-// prompt for any reason (signal decoded, error, idle), we
-// re-issue it. Useful for "leave it listening for hours".
-// ════════════════════════════════════════════════════════════════
-
 import { state, sleep, isValidFlipperFreq } from './state.js';
 import { send } from './serial.js';
 import { log } from './logger.js';
@@ -31,9 +17,7 @@ export async function stopAll() {
   state.continuousRx = false;
   state.continuousFreq = null;
   syncContinuousUI();
-  // 3. Hit Ctrl+C three times back-to-back — first one exits whatever
-  //    is running, the others guarantee the prompt is returned even
-  //    if a TX repeat is mid-burst.
+
   if (state.connected) {
     await send('\x03');
     await sleep(20);
