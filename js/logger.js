@@ -1,26 +1,16 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — logger
-// ────────────────────────────────────────────────────────────────
-// Central log dispatch. The original textContent += pattern grew
-// unbounded — long sessions slowed the page to a crawl. Here we
-// cap at MAX_LOG_LINES and trim oldest when we hit the limit.
-// ════════════════════════════════════════════════════════════════
 
-const MAX_MINI_LINES = 12;     // sidebar log
-const MAX_FULL_LINES = 5000;   // full log tab
-const MAX_RX_LINES   = 2000;   // sub-ghz serial output
+
+const MAX_MINI_LINES = 12;
+const MAX_FULL_LINES = 5000;
+const MAX_RX_LINES   = 2000;
 
 const fullLogLines = [];
 const rxLines = [];
 
-// type: 'ok' | 'warn' | 'signal' | 'info'
 export function log(type, msg) {
   const ts = time();
   const formatted = `[${ts}][${type.toUpperCase()}] ${msg}`;
 
-  // Mirror to the browser console so devs can see everything in
-  // DevTools — much easier to debug serial parsing issues with
-  // console-side filtering than scrolling the in-page log.
   const consoleStyle = {
     ok:     'color:#00FF80;font-weight:bold',
     warn:   'color:#FF2200;font-weight:bold',
@@ -84,12 +74,11 @@ export function getRxText()      { return rxLines.join('\n'); }
 
 function time() { return new Date().toTimeString().slice(0, 8); }
 
-// Trigger a browser download for arbitrary text.
 export function download(name, text) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   a.download = name;
   a.click();
-  // Free the object URL after the click handler runs.
+
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }

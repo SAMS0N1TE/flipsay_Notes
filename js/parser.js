@@ -1,14 +1,4 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — debug TTY line parser
-// ────────────────────────────────────────────────────────────────
-// Every line that comes back from the Flipper passes through here.
-// We extract: device name, packet counts, listening frequency,
-// RSSI values, and signal-detected events.
-//
-// The original RSSI fallback regex only matched -50 to -99 dBm.
-// We accept any negative integer/float so floor noise (-100, -110)
-// and strong signals (-30, -45) both register.
-// ════════════════════════════════════════════════════════════════
+
 
 import { state } from './state.js';
 import { log, appendRX, appendFullLog } from './logger.js';
@@ -17,8 +7,6 @@ import { addSignal } from './signals.js';
 import { setFreqDisplay } from './ui.js';
 import { continuousReissue } from './control.js';
 
-// Strip ANSI colour codes — the Flipper CLI emits things like
-// "[INFO] Load_keystore [0;32mOK[0m" which clutters our log view.
 const ANSI = /\x1b\[[0-9;]*m/g;
 
 export function onLine(rawLine) {
@@ -40,13 +28,9 @@ export function onLine(rawLine) {
   parsePromptForContinuous(line);
 }
 
-// In continuous-rx mode, when the Flipper returns to the prompt
-// (any `>:` line that isn't followed by command echo), re-issue
-// rx_raw so listening resumes. This makes "RX HERE" / continuous
-// mode actually persistent.
 function parsePromptForContinuous(line) {
   if (!state.continuousRx) return;
-  // Match a bare prompt line — `>:` with optional trailing space.
+
   if (/^>:\s*$/.test(line)) {
     continuousReissue();
   }
@@ -68,44 +52,25 @@ function parsePacketCount(line) {
   if (el) el.textContent = state.pktCount;
 }
 
-// "Listening at frequency: 434138427 device: 0"
-// During a sweep this tells us EXACTLY which frequency the radio
-// just retuned to — we stash it so subsequent RSSI lines can be
-// attributed to the right bin instead of the display center.
-//
-// We also inject a low-level synthetic baseline RSSI here so the
-// spectrum visibly progresses across the band during a sweep,
-// even when nothing is being decoded. Without this the sweep
-// visually does nothing because the Flipper CLI does not emit
-// RSSI samples for unknown signals.
 function parseListeningFreq(line) {
   const m = line.match(/Listening at\s+frequency:\s+(\d{8,9})/i);
   if (!m) return;
   const f = +m[1];
   state.activeRxFreq = f;
   if (!state.sweeping) setFreqDisplay(f);
-  // Synthetic floor sample — gives visual feedback that we're
-  // hopping. Real protocol decodes will overwrite with stronger
-  // values via parseSignalDetection.
+
   if (state.sweeping || state.continuousRx) {
     ingestRSSI(-88 + Math.random() * 4, f, false);
   }
 }
 
-// Accept any of:
-//   "RSSI: -82.5"
-//   "rssi -82"
-//   "-82 dBm"
-//   "-82.5 dBm"
 function parseRSSI(line) {
   const m =
     line.match(/RSSI[:\s]+(-?\d+(?:\.\d+)?)/i) ||
     line.match(/(-\d+(?:\.\d+)?)\s*dBm/i);
   if (!m) return;
   const rssi = parseFloat(m[1]);
-  // Use the Flipper's currently-tuned freq when sweeping, the
-  // user's tuning otherwise. This is THE fix that makes the
-  // sweep actually populate the spectrum across the band.
+
   const freq = state.sweeping && state.activeRxFreq
     ? state.activeRxFreq
     : state.curFreq;
@@ -116,19 +81,11 @@ function parseSignalDetection(line) {
   if (!/signal[\s_]detected|protocol:|key:/i.test(line)) return;
   log('signal', 'Signal: ' + line.slice(0, 60));
   addSignal(line);
-  // Inject a strong RSSI bump at the active freq so the user
-  // sees a visual spike where the protocol was decoded.
+
   const freq = state.activeRxFreq || state.curFreq;
   ingestRSSI(-45 + Math.random() * 10, freq, true);
 }
 
-// `info power` output has lines like:
-//   charge_level: 87
-//   gauge_voltage: 4.123
-//   gauge_temperature: 24.5
-//   battery_temperature: 23.9
-//   gauge_current: -123
-// We capture the ones we display.
 const POWER_FIELDS = {
   charge_level: 'pwr-charge',
   gauge_voltage: 'pwr-voltage',
@@ -146,18 +103,13 @@ function parsePowerInfo(line) {
   }
 }
 
-// `loader list` outputs each app on its own line. We can't tell
-// where the list starts/ends from line content alone, but we can
-// heuristically capture lines that look like application names —
-// non-empty, no colon, not a CLI prompt, between calls to listApps.
 function parseAppList(line) {
   if (!state.expectingAppList) return;
   if (/^>:/.test(line) || /^Applications:/i.test(line)) {
     if (/^>:/.test(line)) state.expectingAppList = false;
     return;
   }
-  // Apps look like "Sub-GHz", "NFC", "Sub-GHz Remote", etc.
-  // Skip lines that are clearly not app names.
+
   if (/^(?:OK|ERROR|Listening|Packets|RSSI|Load_keystore|Welcome|Read|Run|Firmware|info|device_info)/i.test(line)) return;
   if (line.length > 60) return;
   state.apps.push(line.trim());
@@ -182,9 +134,6 @@ function renderApps() {
   }
 }
 
-// `storage list /ext/subghz` outputs lines like:
-//   [F] mything.sub
-//   [D] keeloq
 function parseFileList(line) {
   if (!state.subListingDir) return;
   const m = line.match(/^\[([FD])\]\s+(.+)$/);
@@ -228,7 +177,6 @@ function renderSubFiles() {
   }
 }
 
-// `gpio read pa7` outputs a single value line.
 function parseGpioRead(line) {
   if (!state.expectingGpioRead) return;
   const m = line.match(/^[01]$/);

@@ -1,20 +1,20 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — minimal resizable splitter
-// ────────────────────────────────────────────────────────────────
-// Purpose-built (~3KB) replacement for Split.js. Inserts draggable
-// gutters between flex children, resizes them on drag, persists
-// sizes to localStorage.
-//
-// Usage:
-//   createSplit({
-//     container: document.getElementById('center'),
-//     direction: 'vertical',     // 'vertical' = stacked, 'horizontal' = side-by-side
-//     children: ['#fbar', '#speczone', '#lower'],
-//     sizes:    [10, 65, 25],    // percent — sums to 100
-//     minSizes: [40, 100, 100],  // pixels
-//     storageKey: 'flipsay.layout.center',
-//   });
-// ════════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export function createSplit({
   container,
@@ -38,7 +38,7 @@ export function createSplit({
   container.style.display = 'flex';
   container.style.flexDirection = isHorizontal ? 'row' : 'column';
 
-  // Restore saved sizes if present.
+
   let currentSizes = [...sizes];
   if (storageKey) {
     try {

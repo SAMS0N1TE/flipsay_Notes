@@ -1,10 +1,4 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — captured signals list
-// ────────────────────────────────────────────────────────────────
-// When the parser sees "signal_detected" / "protocol:" / "key:"
-// from the Flipper, addSignal() gets called and the entry shows
-// up in the Signals tab. Capped at MAX so memory stays bounded.
-// ════════════════════════════════════════════════════════════════
+
 
 import { state } from './state.js';
 import { download } from './logger.js';
@@ -30,7 +24,7 @@ export function render() {
     c.innerHTML = '<div style="font-size:6px;color:var(--DIM);">No signals detected yet.</div>';
     return;
   }
-  // Build with createElement to avoid HTML injection from raw CLI lines.
+
   c.innerHTML = '';
   for (const s of state.signals.slice(0, 60)) {
     const item = document.createElement('div');

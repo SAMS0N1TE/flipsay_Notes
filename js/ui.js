@@ -1,14 +1,7 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — UI wiring
-// ────────────────────────────────────────────────────────────────
-// DOM event handlers that don't belong to a specific module.
-// Tabs, frequency display sync, gain sliders, welcome modal.
-// ════════════════════════════════════════════════════════════════
+
 
 import { state, isValidFlipperFreq } from './state.js';
 import { log } from './logger.js';
-
-// ── Welcome modal ──────────────────────────────────────────────
 
 export function initWelcome() {
   const modal = document.getElementById('welcome');
@@ -18,32 +11,26 @@ export function initWelcome() {
   const close = () => { modal.style.display = 'none'; };
   okBtn?.addEventListener('click', close);
 
-  // Click outside the box to dismiss.
   modal.addEventListener('click', e => { if (e.target === modal) close(); });
-  // Escape to dismiss.
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && modal.style.display !== 'none') close();
   });
 }
-
-// ── Tabs ───────────────────────────────────────────────────────
 
 export function showTab(name, el) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name)?.classList.add('active');
-  // Defer resize so the canvas picks up the new container size.
+
   setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
 }
-
-// ── Frequency display ──────────────────────────────────────────
 
 export function setFreqDisplay(hz) {
   state.curFreq = hz;
   const mhz = (hz / 1e6).toFixed(6);
-  // Update the editable input only if the user isn't currently
-  // editing it — would be jarring to have it overwritten mid-type.
+
   const input = document.getElementById('fdisp-input');
   if (input && document.activeElement !== input) input.value = mhz;
   const big = document.getElementById('bigfreq');
@@ -57,7 +44,6 @@ export function setFreqDisplay(hz) {
   document.getElementById('xa-r').textContent  = ((hz / 1e6) + bw * 0.9).toFixed(1) + ' MHz';
 }
 
-// Set frequency from a MHz string/number (input handler).
 export function setFreqMHz(v) {
   const mhz = parseFloat(v);
   if (isNaN(mhz)) return;
@@ -69,7 +55,6 @@ export function setFreqMHz(v) {
   setFreqDisplay(hz);
 }
 
-// stepFreq now takes a MHz delta (e.g. 0.01 = 10 kHz).
 export function stepFreq(deltaMHz) {
   const next = state.curFreq + Math.round(deltaMHz * 100_000);
   state.curFreq = Math.max(300_000_000, Math.min(928_000_000, next));
@@ -100,11 +85,6 @@ export function setRXTX(mode) {
   document.getElementById('rx-b').classList.toggle('on', mode === 'rx');
   document.getElementById('tx-b').classList.toggle('on', mode === 'tx');
 }
-
-// ── Gain bars ──────────────────────────────────────────────────
-// These currently only update local UI. A future contribution
-// could wire them to actual CC1101 register writes via a custom
-// firmware command — see TODO in README.
 
 const gainMax = { lna: 40, mix: 24, if: 40 };
 
@@ -137,8 +117,6 @@ function applyGain(id, db) {
   document.getElementById(map[id][1]).textContent = db + ' dB';
 }
 
-// ── Status bar clock ───────────────────────────────────────────
-
 export function initClock() {
   const tick = () => {
     const el = document.getElementById('sbar-time');
@@ -147,9 +125,6 @@ export function initClock() {
   tick();
   setInterval(tick, 1000);
 }
-
-// ── Connection-state UI sync ───────────────────────────────────
-// Called from main when serial connection state changes.
 
 export function syncConnectionUI() {
   const btn = document.getElementById('conn-btn');

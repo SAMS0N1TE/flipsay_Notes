@@ -1,16 +1,4 @@
-// ════════════════════════════════════════════════════════════════
-// FlipSay — spectrum + waterfall rendering
-// ────────────────────────────────────────────────────────────────
-// Three render modes:
-//   real — RSSI from the Flipper, amplified so weak signals show
-//   sim  — animated demo data, no hardware needed
-//   pkg  — only show bins where a packet was actually decoded
-//
-// Performance notes vs the original:
-//   * willReadFrequently:true on the waterfall context (Chrome warning)
-//   * Reused ImageData buffer instead of allocating per frame
-//   * Cached DOM references for hot paths
-// ════════════════════════════════════════════════════════════════
+
 
 import { state, BINS } from './state.js';
 
@@ -20,8 +8,6 @@ const MODE_DESCS = {
   pkg:  'Captured packets only · real decoded data',
 };
 
-// Get the current UI scale from the CSS variable so canvas-drawn
-// text scales with the rest of the UI.
 function uiScale() {
   const v = getComputedStyle(document.documentElement).getPropertyValue('--scale').trim();
   const n = parseFloat(v);
@@ -29,18 +15,15 @@ function uiScale() {
 }
 
 let SC, WC, SX, WX;
-let wfImageData = null;     // reused per frame
+let wfImageData = null;
 let cachedEls = {};
 let lastWFTime = 0;
-
-// ── Init ───────────────────────────────────────────────────────
 
 export function initSpectrum() {
   SC = document.getElementById('spec-canvas');
   WC = document.getElementById('wf-canvas');
   SX = SC.getContext('2d');
-  // willReadFrequently silences the Chrome warning and keeps the
-  // waterfall canvas in CPU memory where getImageData is fast.
+
   WX = WC.getContext('2d', { willReadFrequently: true });
 
   cachedEls = {
@@ -66,11 +49,9 @@ function resize() {
   SC.width = w;
   SC.height = Math.max(60, h - WC.height - 18);
   WC.width = w;
-  // Re-create the image data buffer at the new size.
+
   wfImageData = WX.createImageData(WC.width, WC.height);
 }
-
-// ── Mode switching ─────────────────────────────────────────────
 
 export function setMode(mode) {
   state.specMode = mode;
@@ -95,12 +76,6 @@ function updateBadge() {
   }
 }
 
-// ── Data feeders ───────────────────────────────────────────────
-
-// Called by the parser whenever an RSSI value arrives.
-// freq is the frequency the radio was tuned to when this RSSI
-// was sampled (NOT necessarily the user's display freq — see
-// parser.js for the sweep-tracking logic).
 export function ingestRSSI(rssi, freq, isPacket) {
   state.lastRSSI = rssi;
   if (cachedEls.liveRssi) cachedEls.liveRssi.textContent = rssi.toFixed(1) + ' dBm';
@@ -108,14 +83,12 @@ export function ingestRSSI(rssi, freq, isPacket) {
   const pct = Math.max(0, Math.min(100, (rssi + 100) / 65 * 100));
   if (cachedEls.sigfill) cachedEls.sigfill.style.width = pct + '%';
 
-  // freq → bin. Window is centered on curFreq with width curBW kHz.
   const bwHz = state.curBW * 1000;
   const fMin = state.curFreq - bwHz / 2;
   const fMax = state.curFreq + bwHz / 2;
   const bin = Math.round((freq - fMin) / (fMax - fMin) * (BINS - 1));
   if (bin < 0 || bin >= BINS) return;
 
-  // EMA smoothing on direct hit + gaussian-ish spread to neighbours.
   state.specReal[bin] = state.specReal[bin] === null
     ? rssi
     : state.specReal[bin] * 0.5 + rssi * 0.5;
@@ -145,8 +118,6 @@ export function ingestRSSI(rssi, freq, isPacket) {
   if (state.specMode === 'real') updateBadge();
 }
 
-// ── Per-mode display data generators ───────────────────────────
-
 function tickSim() {
   state.simPhase += 0.04;
   const n = BINS, d = new Array(n);
@@ -167,10 +138,10 @@ function tickSim() {
 function getRealDisplay() {
   const hasData = state.specReal.some(v => v !== null);
   if (!hasData) return new Array(BINS).fill(-92);
-  // Compress noise floor, lift weak signals so they're visible.
+
   return state.specReal.map(v => {
     if (v === null) return -92;
-    const normalized = (v + 100) / 40; // -100..-60 → 0..1
+    const normalized = (v + 100) / 40;
     return Math.min(-10, -90 + normalized * 70);
   });
 }
@@ -185,14 +156,11 @@ function getDisplayData() {
   return getRealDisplay();
 }
 
-// ── Drawing ────────────────────────────────────────────────────
-
 function drawSpec(data) {
   const w = SC.width, h = SC.height;
   if (!w || !h) return;
   SX.fillStyle = '#0C0700'; SX.fillRect(0, 0, w, h);
 
-  // Grid
   SX.strokeStyle = 'rgba(255,128,0,0.09)'; SX.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = h / 4 * i;
@@ -203,7 +171,6 @@ function drawSpec(data) {
     SX.beginPath(); SX.moveTo(x, 0); SX.lineTo(x, h); SX.stroke();
   }
 
-  // Empty-state placeholder.
   if (state.specMode !== 'sim' && !data.some(v => v > -93)) {
     SX.strokeStyle = 'rgba(122,69,0,0.35)'; SX.setLineDash([4, 6]);
     SX.beginPath(); SX.moveTo(0, h * 0.88); SX.lineTo(w, h * 0.88); SX.stroke();
@@ -222,7 +189,6 @@ function drawSpec(data) {
   const n = data.length, step = w / n;
   const minR = -100, rng = 90;
 
-  // Filled area under the curve.
   SX.beginPath(); SX.moveTo(0, h);
   for (let i = 0; i < n; i++) {
     const x = i * step;
@@ -237,7 +203,6 @@ function drawSpec(data) {
   g.addColorStop(1,    'rgba(20,8,0,0.04)');
   SX.fillStyle = g; SX.fill();
 
-  // Top stroke with glow.
   SX.beginPath();
   SX.strokeStyle = '#FFB040'; SX.lineWidth = 1.5;
   SX.shadowColor = '#FF8000'; SX.shadowBlur = 6;
@@ -248,13 +213,11 @@ function drawSpec(data) {
   }
   SX.stroke(); SX.shadowBlur = 0;
 
-  // Center marker.
   SX.setLineDash([4, 4]);
   SX.strokeStyle = 'rgba(255,200,80,0.4)'; SX.lineWidth = 1;
   SX.beginPath(); SX.moveTo(w / 2, 0); SX.lineTo(w / 2, h); SX.stroke();
   SX.setLineDash([]);
 
-  // dBm scale labels.
   SX.fillStyle = 'rgba(255,128,0,0.4)';
   SX.font = `${Math.round(5 * uiScale())}px "Press Start 2P"`;
   for (const [db, f] of [[-20, 0.05], [-40, 0.26], [-60, 0.48], [-80, 0.70], [-90, 0.87]]) {
@@ -267,11 +230,9 @@ function drawWF(data) {
   if (!w || !h || !wfImageData) return;
   const shift = 4;
 
-  // Read existing canvas, shift it down by `shift` rows.
   const prev = WX.getImageData(0, 0, w, h);
   wfImageData.data.set(prev.data.subarray(0, w * (h - shift) * 4), w * shift * 4);
 
-  // Draw new top rows from this frame's data.
   const n = data.length;
   const hasAny = data.some(v => v > -93);
   for (let x = 0; x < w; x++) {
@@ -291,12 +252,10 @@ function drawWF(data) {
   WX.putImageData(wfImageData, 0, 0);
 }
 
-// ── Main loop ──────────────────────────────────────────────────
-
 function frame(ts) {
   const data = getDisplayData();
   drawSpec(data);
-  // Throttle waterfall to ~8 fps — it's expensive.
+
   if (ts - lastWFTime > 120) { drawWF(data); lastWFTime = ts; }
   requestAnimationFrame(frame);
 }
